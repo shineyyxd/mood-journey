@@ -5,21 +5,109 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="theme-color" content="#05070d" />
 <title>CLAUDIO FM · Russell 情绪旅程电台</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%238fb8d8' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23fff'/%3E%3C/svg%3E" />
 <link rel="stylesheet" href="./css/main.css" />
 </head>
 <body>
+  <!-- 主渲染画布：流体背景 / 弧线 / 光点 / 粒子 / 后期 -->
   <canvas id="stage"></canvas>
+
+  <!-- Russell 情绪圆盘（独立画布，可拖拽） -->
   <canvas id="disc" aria-label="Russell 情绪平面圆盘"></canvas>
+
+  <!-- 顶部品牌与状态 -->
   <header id="brand">
     <div class="brand-left">
       <span class="brand-name">CLAUDIO&nbsp;FM</span>
       <span class="brand-sub">Russell 情绪旅程电台</span>
     </div>
     <div class="brand-right">
+      <div id="skin-dots" title="皮肤 (T)"></div>
       <span id="clock"></span>
-      <span id="quality-badge"></span>
-      <span id="audio-badge">AUDIO</span>
+      <span id="quality-badge" title="按 Q 切换画质"></span>
+      <span id="audio-badge" class="badge-warn" title="音频链路状态">AUDIO</span>
     </div>
   </header>
+
+  <!-- 开场：情绪语义输入 -->
+  <section id="entry" class="overlay">
+    <h1 class="entry-title">此刻，你在哪里？</h1>
+    <p class="entry-sub">说一句话，CLAUDIO 会在 Russell 平面上找到你的坐标，<br/>然后用音乐把你带去更好的地方。</p>
+    <div class="entry-row">
+      <input id="entry-input" type="text" maxlength="60"
+             placeholder="例如：加班到麻木 / 心里很乱 / 有点想哭…" autocomplete="off"/>
+      <button id="entry-go" class="btn-solid" title="开始旅程 (Enter)">启程</button>
+    </div>
+    <div class="entry-chips" id="entry-chips"></div>
+    <div class="entry-presets" id="entry-presets"></div>
+    <p class="entry-hint">D 演示循环 · Space 播放/暂停 · H 全部快捷键</p>
+  </section>
+
+  <!-- 双终点分歧选择 -->
+  <section id="fork" class="overlay hidden">
+    <p class="fork-lead serif">接住你了。现在，想去哪里？</p>
+    <div class="fork-cards">
+      <button class="fork-card" id="fork-a"></button>
+      <button class="fork-card" id="fork-b"></button>
+    </div>
+  </section>
+
+  <!-- 实时 HUD：情绪坐标面板 -->
+  <aside id="hud" class="hidden">
+    <div class="hud-title">HUD · 情绪遥测</div>
+    <div class="hud-grid">
+      <span>V 愉悦度</span><b id="hud-v">—</b>
+      <span>A 唤醒度</span><b id="hud-a">—</b>
+      <span>象限</span><b id="hud-q">—</b>
+      <span>旅程进度</span><b id="hud-p">—</b>
+      <span>曲率 κ</span><b id="hud-k">—</b>
+      <span>能量</span><b id="hud-e">—</b>
+      <span>速度</span><b id="hud-bpm">—</b>
+      <span>色温</span><b id="hud-c">—</b>
+      <span>FPS</span><b id="hud-fps">—</b>
+    </div>
+  </aside>
+
+  <!-- 21 项参数面板 -->
+  <aside id="params" class="hidden">
+    <div class="params-head">
+      <span>调参台 · 21 项</span>
+      <button id="params-reset" title="恢复默认">RESET</button>
+    </div>
+    <div id="params-body"></div>
+  </aside>
+
+  <!-- 帮助 -->
+  <aside id="help" class="overlay hidden">
+    <div class="help-box">
+      <h2 class="serif">快捷键</h2>
+      <table>
+        <tr><td>Space</td><td>播放 / 暂停旅程</td></tr>
+        <tr><td>Enter</td><td>开始 / 确认</td></tr>
+        <tr><td>D</td><td>自动演示循环</td></tr>
+        <tr><td>0 – 9</td><td>调试视图</td></tr>
+        <tr><td>Q</td><td>画质档位 Standard / High / Cinematic</td></tr>
+        <tr><td>T</td><td>切换皮肤（深海 / 暮色 / 苔原 / 雾紫 / 纸白）</td></tr>
+        <tr><td>P</td><td>调参台</td></tr>
+        <tr><td>M</td><td>静音</td></tr>
+        <tr><td>S</td><td>生成快照 PNG</td></tr>
+        <tr><td>U</td><td>复制分享 URL</td></tr>
+        <tr><td>R</td><td>回到入口</td></tr>
+        <tr><td>H</td><td>本帮助</td></tr>
+      </table>
+      <p class="help-foot">圆盘可自由拖拽当前情绪点 · 终点节点可点击切换</p>
+      <button id="help-close" class="btn-solid">关闭</button>
+    </div>
+  </aside>
+
+  <!-- 声音开启引导（自动播放策略） -->
+  <div id="audio-gate" class="hidden">
+    <button id="audio-gate-btn">开启声音</button>
+  </div>
+
+  <!-- 吐司 -->
+  <div id="toast"></div>
+
+  <script type="module" src="./js/main.js"></script>
 </body>
 </html>

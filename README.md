@@ -1,0 +1,60 @@
+# CLAUDIO FM — Russell 情绪旅程电台
+
+全屏沉浸式 AI 情绪电台。原生 HTML/CSS/JS + ES Modules + Canvas 2D + Web Audio API。
+零构建工具、零运行时外部依赖，任意静态服务器即可运行。
+
+## 本地启动
+
+```bash
+cd app
+python3 -m http.server 8080
+# 打开 http://localhost:8080
+```
+
+或任何静态服务器：`npx serve .` / `caddy file-server` / Nginx 静态目录均可。
+注意：ES Modules 要求 http(s) 协议，直接双击 file:// 打开无法运行。
+
+## 结构
+
+```
+app/
+├── index.html          # 入口，DOM 骨架（覆盖层/HUD/调参台/帮助）
+├── css/main.css        # 全部样式，移动端断点 720px
+├── js/
+│   ├── main.js         # 主控：状态机 / 演示循环 / 快捷键接线 / 持久化 / 皮肤切换
+│   ├── config.js       # 21 项参数单一事实源 + 三档画质配置
+│   ├── skins.js        # 5 套皮肤（深海/暮色/苔原/雾紫/纸白）
+│   ├── emotion.js      # Russell 平面：语义推断 / 象限 / 色阶红移 / 4 预设
+│   ├── arc.js          # 三次贝塞尔弧线 + smoothstep 缓动 + 曲率/切线解析
+│   ├── renderer.js     # Canvas 2D 内核：干净流体场/ACES/暗角/辉光/粒子
+│   ├── audio.js        # Web Audio 程序化音乐引擎 + 垫乐 + 自动降级
+│   ├── hud.js          # HUD 遥测 / 调参台 / Russell 圆盘（可拖拽）
+│   ├── input.js        # 全局快捷键
+│   └── state.js        # localStorage 持久化 / URL 分享 / 快照合成
+├── vendor/noise.js     # 自包含 Perlin 改进噪声（固定种子）
+└── audio/pad_low.mp3   # 低频氛围垫乐（22s 无缝循环）
+```
+
+## 核心机制
+
+- **情绪弧线**：起点/终点为 Russell 平面坐标 (v,a)∈[-1,1]²，三次贝塞尔 +
+  n 阶 smoothstep 缓动采样；播放光点、HUD、音乐引擎、背景色温全部锚定同一坐标源。
+- **曲风能量连续渐变**：valence → 小调/大调五声音阶混合概率；arousal →
+  BPM、滤波截止、琶音密度、音符衰减时长。
+- **皮肤系统**：5 套皮肤（深海/暮色/苔原/雾紫/纸白），按 T 或点顶栏圆点切换。
+  皮肤改变「房间的光」——底色、UI 墨色系、情绪色场色相整体偏移；情绪色阶逻辑不变。
+  浅色皮肤（纸白）下弧线辉光、光点、圆盘、面板自动切换为深色墨水语言。
+- **电影级后期**：逐像素 ACES 色调映射（Narkowicz 拟合）、径向暗角、RGB 色散叠印、
+  弧线三层辉光描边。磁带颗粒默认关闭，调参台可手动加回。
+- **降级策略**：AudioContext 创建失败 / 垫乐加载失败 / 单音调度异常，
+  分别降级到对应层级，视觉旅程永不中断，HUD 角标实时显示链路状态。
+
+## 快捷键
+
+Space 播放/暂停 · D 演示循环 · 0-9 调试视图 · Q 画质 · P 调参台 ·
+M 静音 · S 快照 · U 分享链接 · R 回入口 · H 帮助
+
+## 分享与快照
+
+- `U`：旅程状态（起点/终点/进度/画质）编码进 URL hash，粘贴即恢复同一旅程。
+- `S`：合成主画布 + 圆盘 + 元信息水印，导出 PNG 快照。
