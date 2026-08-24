@@ -1,4 +1,4 @@
-/* CLAUDIO FM — Russell 情绪旅程电台 */
+/* 情绪旅程 · MOOD JOURNEY — Russell 情绪旅程电台 */
 
 /* ——— 皮肤变量：每套皮肤改变「房间的光线」 ——— */
 body.skin-abyss {
@@ -86,12 +86,7 @@ body {
 .hidden { display: none !important; }
 
 /* ——— 画布 ——— */
-#stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
-#disc {
-  position: fixed; left: 20px; bottom: 20px; z-index: 9;
-  width: 208px; height: 208px; cursor: grab; touch-action: none;
-}
-#disc:active { cursor: grabbing; }
+#stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 
 /* ——— 品牌 ——— */
 #brand {
@@ -125,7 +120,9 @@ body {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   text-align: center; padding: 24px;
   animation: fadein 1.2s ease both;
+  pointer-events: none; /* 让盘面拖拽穿透覆盖层 */
 }
+.overlay button, .overlay input, .help-box { pointer-events: auto; }
 @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
 
 .entry-title { font-family: var(--serif); font-size: clamp(28px, 5vw, 44px); font-weight: 300; letter-spacing: 0.28em; margin-bottom: 18px; }
@@ -237,7 +234,6 @@ body {
 
 /* ——— 移动端 ——— */
 @media (max-width: 720px) {
-  #disc { width: 148px; height: 148px; left: 12px; bottom: 12px; }
   #hud { right: 12px; top: 58px; width: 178px; padding: 10px 12px; }
   .hud-grid { font-size: 10px; gap: 4px 8px; }
   #params { right: 12px; left: 12px; top: 58px; bottom: 178px; width: auto; }

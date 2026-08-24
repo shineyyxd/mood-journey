@@ -1,10 +1,10 @@
 // ————————————————————————————————————————————————
 // renderer.js · Canvas 2D 渲染内核
 // 程序化流体背景 + ACES 电影级色调映射 + 暗角 + 磁带颗粒 + 色散
-// 弧线辉光 / 光点追踪 / 粒子曲率牵引 / 调试视图
+// 黑胶盘面（盘面即 Russell 平面投影，纹理层自转）/ 弧线辉光 / 光点追踪 / 粒子曲率牵引 / 调试视图
 // ————————————————————————————————————————————————
 import { fbm } from '../vendor/noise.js';
-import { emotionColor, hslRgb, clamp, lerp } from './emotion.js';
+import { emotionColor, hslRgb, hslCss, clamp, lerp } from './emotion.js';
 import { arcPoint, arcTangent, arcCurvature } from './arc.js';
 
 // ACES filmic tonemap（Narkowicz 拟合）
@@ -12,13 +12,14 @@ function aces(x) {
   return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0, 1);
 }
 
-// 平面坐标 → 屏幕坐标（主舞台：以中右部为旅程画幅）
+// 平面坐标 → 屏幕坐标（盘面合一：Russell 正方形 [-1,1]² 四角恰好内接唱片盘面）
 export function makeProjector(W, H) {
   const cx = W * 0.5, cy = H * 0.52;
-  const scale = Math.min(W, H) * 0.36;
+  const radius = Math.min(W, H) * 0.40;
+  const scale = radius / Math.SQRT2;
   return {
     toScreen(p) { return { x: cx + p.v * scale, y: cy - p.a * scale }; },
-    scale,
+    scale, cx, cy, radius, // cx/cy/radius 供盘面拖拽命中测试复用
   };
 }
 
@@ -31,6 +32,9 @@ export class Renderer {
     this.particles = [];
     this.t = 0;
     this.fps = 60;
+    this.spinAngle = 0;   // 盘面自转角（仅纹理层随转）
+    this.spinVel = 0;     // 自转速度（缓动逼近目标）
+    this.discAlpha = 0.4; // 盘面整体透明度（非旅程态淡出）
     this._lastFrame = performance.now();
     this.resize();
   }
@@ -77,6 +81,14 @@ export class Renderer {
     const cur = state.arc ? arcPoint(state.arc, state.pro, P.smoothSteps) : state.freePoint;
     const cc = emotionColor(cur.v, cur.a, P.redShift);
 
+    // 盘面自转：缓动逼近目标转速，暂停平滑停转、无跳变
+    const spinTarget = state.playing ? P.spinSpeed : 0;
+    this.spinVel = lerp(this.spinVel, spinTarget, 1 - Math.exp(-dt * 2));
+    this.spinAngle += this.spinVel * dt * (Math.PI / 9); // spinSpeed=1 → 约 18 秒/圈
+
+    // 非旅程态盘面淡出（入口屏文字压在盘面上仍可读）
+    this.discAlpha = lerp(this.discAlpha, state.arc ? 1 : 0.4, 1 - Math.exp(-dt * 4));
+
     this.renderFluid(cur, cc, state);
 
     // 上屏不做额外柔化（分辨率已足够，保留噪声细节）
@@ -84,11 +96,16 @@ export class Renderer {
     ctx.imageSmoothingQuality = 'low';
     ctx.drawImage(this.bg, 0, 0, this.bgW, this.bgH, 0, 0, this.W, this.H);
 
+    // 盘面组：唱片 / 弧线 / 粒子 / 光点整体随 discAlpha 淡入淡出
+    ctx.save();
+    ctx.globalAlpha = this.discAlpha;
+    this.drawDisc(state, cur, cc);
     if (state.arc) {
       this.drawArc(state, cur, cc);
       this.drawParticles(state, cur, cc);
-      this.drawDot(state, cur, cc);
     }
+    this.drawDot(state, cur, cc); // 始终绘制：无旅程时 freePoint 光点供拖拽反馈
+    ctx.restore();
 
     // 色散：主画布自叠印（High/Cinematic）
     if (Q.aberration && P.aberration > 0.05) {
@@ -182,6 +199,99 @@ export class Renderer {
     this.bgCtx.putImageData(this.bgImg, 0, 0);
   }
 
+  // —— 黑胶盘面：盘面即 Russell 平面投影，仅 grooves/光泽/标签等纹理层自转 ——
+  drawDisc(state, cur, cc) {
+    const { params: P, skin } = state;
+    const light = skin?.mode === 'light';
+    const ctx = this.ctx;
+    const proj = makeProjector(this.W, this.H);
+    const { cx, cy, radius: R } = proj;
+    const base = skin?.rgb || [5, 7, 13];
+    const ink = (a) => light ? `rgba(26,30,40,${a})` : `rgba(255,255,255,${a})`;
+    // 盘体底色：深色皮肤由皮肤底色调暗（微透流体背景），纸白用奶油色
+    const bodyRgb = light ? [247, 244, 236] : base.map(c => Math.round(c * 0.5));
+
+    ctx.save();
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7);
+    ctx.fillStyle = `rgba(${bodyRgb},${light ? 0.94 : 0.88})`;
+    ctx.fill();
+
+    // —— 旋转纹理层：clip 盘面后 translate+rotate；Russell 映射/弧线/光点不随转 ——
+    ctx.save();
+    ctx.clip();
+    ctx.translate(cx, cy);
+    ctx.rotate(this.spinAngle);
+
+    // 同心圆 grooves（细、淡）
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = light ? 'rgba(26,30,40,0.06)' : 'rgba(255,255,255,0.05)';
+    for (let i = 0; i < 26; i++) {
+      const r = R * (0.16 + 0.81 * (i / 25));
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.stroke();
+    }
+
+    // 一瓣极淡的光泽扫掠扇形：纯同心圆旋转不可见，扫掠让自转可感知
+    const sheen = ctx.createConicGradient(0, 0, 0);
+    sheen.addColorStop(0, 'rgba(255,255,255,0)');
+    sheen.addColorStop(0.05, `rgba(255,255,255,${light ? 0.10 : 0.055})`);
+    sheen.addColorStop(0.10, 'rgba(255,255,255,0)');
+    sheen.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sheen;
+    ctx.fillRect(-R, -R, R * 2, R * 2);
+
+    // 中心标签：底色亮一档 + 细描边 + 情绪色细环 + 偏心标记点 + 轴孔
+    const lr = R * 0.11;
+    const labelRgb = light ? bodyRgb : bodyRgb.map(c => Math.min(c + 24, 255));
+    ctx.beginPath(); ctx.arc(0, 0, lr, 0, 7);
+    ctx.fillStyle = `rgb(${labelRgb})`;
+    ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = ink(0.22);
+    ctx.stroke();
+    // 标签边缘一圈情绪色细环（标签本体不实心填充情绪色）
+    const ringRgb = hslRgb(cc).map(Math.round);
+    ctx.beginPath(); ctx.arc(0, 0, lr - 3, 0, 7);
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = `rgba(${ringRgb},0.9)`;
+    ctx.stroke();
+    // 偏心标记点：标签自转的指针
+    ctx.beginPath(); ctx.arc(lr * 0.5, 0, Math.max(R * 0.008, 2), 0, 7);
+    ctx.fillStyle = ink(0.5);
+    ctx.fill();
+    // 中心轴孔
+    ctx.beginPath(); ctx.arc(0, 0, Math.max(R * 0.02, 3), 0, 7);
+    ctx.fillStyle = light ? '#f3f0ea' : `rgb(${base.map(c => Math.round(c * 0.3))})`;
+    ctx.fill();
+
+    ctx.restore(); // 出旋转纹理层
+
+    // —— 屏幕静止层：象限语义不随盘面旋转 ——
+    if (light) {
+      // 纸白：极淡四象限暗示（深色皮肤不画——试过，浑浊发黄很脏）
+      for (let qv = 0; qv < 2; qv++) for (let qa = 0; qa < 2; qa++) {
+        const col = emotionColor(qv ? 0.5 : -0.5, qa ? 0.5 : -0.5, P.redShift);
+        ctx.fillStyle = hslCss(col, 0.06);
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, R, (qa ? Math.PI : 0) + (qv ? 0 : Math.PI / 2), (qa ? Math.PI : 0) + (qv ? Math.PI / 2 : Math.PI));
+        ctx.closePath(); ctx.fill();
+      }
+    }
+    // 象限轴线（深色下极淡）
+    ctx.strokeStyle = ink(light ? 0.10 : 0.045);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx - R, cy); ctx.lineTo(cx + R, cy);
+    ctx.moveTo(cx, cy - R); ctx.lineTo(cx, cy + R);
+    ctx.stroke();
+    // 盘面外缘
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7);
+    ctx.strokeStyle = ink(light ? 0.25 : 0.30);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
   // —— 弧线：辉光描边（多层叠加，无 shadowBlur 性能陷阱）——
   drawArc(state, cur, cc) {
     const { arc, pro, params: P, skin } = state;
@@ -194,6 +304,8 @@ export class Renderer {
     for (let i = 0; i <= N; i++) pts.push(proj.toScreen(arcPoint(arc, i / N, P.smoothSteps)));
 
     ctx.save();
+    // 盘面圆形 clip：防辉光溢出唱片
+    ctx.beginPath(); ctx.arc(proj.cx, proj.cy, proj.radius, 0, 7); ctx.clip();
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
 
     const col = (a) => `rgba(${hslRgb(cc).map(Math.round).join(',')},${a})`;
@@ -275,8 +387,8 @@ export class Renderer {
       const d = Math.hypot(dx, dy) || 1;
       const pull = P.pullForce * clamp(1 - d / (this.W * 0.55), 0, 1);
       const swirl = (kappa * 0.15 + 0.12) * pull;
-      pt.vx += (dx / d) * pull * 0.5 + (tvx / tl) * swirl * 8 + (Math.random() - 0.5) * 0.3;
-      pt.vy += (dy / d) * pull * 0.5 + (tvy / tl) * swirl * 8 + (Math.random() - 0.5) * 0.3;
+      pt.vx += (dx / d) * pull * 0.5 + (tvx / tl) * swirl * 8 + (Math.random() - 0.5) * 0.1;
+      pt.vy += (dy / d) * pull * 0.5 + (tvy / tl) * swirl * 8 + (Math.random() - 0.5) * 0.1;
       pt.vx *= 0.94; pt.vy *= 0.94;
       pt.x += pt.vx; pt.y += pt.vy;
       pt.life -= 0.002;

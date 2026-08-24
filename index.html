@@ -4,22 +4,19 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="theme-color" content="#05070d" />
-<title>CLAUDIO FM · Russell 情绪旅程电台</title>
+<title>情绪旅程 · MOOD JOURNEY</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%238fb8d8' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23fff'/%3E%3C/svg%3E" />
 <link rel="stylesheet" href="./css/main.css" />
 </head>
 <body>
-  <!-- 主渲染画布：流体背景 / 弧线 / 光点 / 粒子 / 后期 -->
+  <!-- 主渲染画布：流体背景 / 黑胶盘面 / 弧线 / 光点 / 粒子 / 后期 -->
   <canvas id="stage"></canvas>
-
-  <!-- Russell 情绪圆盘（独立画布，可拖拽） -->
-  <canvas id="disc" aria-label="Russell 情绪平面圆盘"></canvas>
 
   <!-- 顶部品牌与状态 -->
   <header id="brand">
     <div class="brand-left">
-      <span class="brand-name">CLAUDIO&nbsp;FM</span>
-      <span class="brand-sub">Russell 情绪旅程电台</span>
+      <span class="brand-name">情绪旅程</span>
+      <span class="brand-sub">MOOD JOURNEY</span>
     </div>
     <div class="brand-right">
       <div id="skin-dots" title="皮肤 (T)"></div>
@@ -32,7 +29,7 @@
   <!-- 开场：情绪语义输入 -->
   <section id="entry" class="overlay">
     <h1 class="entry-title">此刻，你在哪里？</h1>
-    <p class="entry-sub">说一句话，CLAUDIO 会在 Russell 平面上找到你的坐标，<br/>然后用音乐把你带去更好的地方。</p>
+    <p class="entry-sub">说一句话，情绪旅程会在 Russell 平面上找到你的坐标，<br/>然后用音乐把你带去更好的地方。</p>
     <div class="entry-row">
       <input id="entry-input" type="text" maxlength="60"
              placeholder="例如：加班到麻木 / 心里很乱 / 有点想哭…" autocomplete="off"/>
@@ -68,10 +65,10 @@
     </div>
   </aside>
 
-  <!-- 21 项参数面板 -->
+  <!-- 22 项参数面板 -->
   <aside id="params" class="hidden">
     <div class="params-head">
-      <span>调参台 · 21 项</span>
+      <span>调参台 · 22 项</span>
       <button id="params-reset" title="恢复默认">RESET</button>
     </div>
     <div id="params-body"></div>
@@ -95,7 +92,7 @@
         <tr><td>R</td><td>回到入口</td></tr>
         <tr><td>H</td><td>本帮助</td></tr>
       </table>
-      <p class="help-foot">圆盘可自由拖拽当前情绪点 · 终点节点可点击切换</p>
+      <p class="help-foot">唱片盘面可自由拖拽当前情绪点</p>
       <button id="help-close" class="btn-solid">关闭</button>
     </div>
   </aside>

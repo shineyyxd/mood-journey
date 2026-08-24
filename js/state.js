@@ -56,18 +56,17 @@ export function mergeParams(saved) {
   return p;
 }
 
-// —— 快照：合成主画布 + 圆盘 → PNG ——
-export function makeSnapshot(stageCanvas, discCanvas, meta) {
+// —— 快照：主画布 + 元信息水印 → PNG ——
+export function makeSnapshot(stageCanvas, meta) {
   const out = document.createElement('canvas');
   out.width = stageCanvas.width; out.height = stageCanvas.height;
   const ctx = out.getContext('2d');
   ctx.drawImage(stageCanvas, 0, 0);
   const r = stageCanvas.width / window.innerWidth; // dpr 比
-  ctx.drawImage(discCanvas, 20 * r, out.height - 20 * r - discCanvas.height);
   // 元信息水印
   ctx.fillStyle = 'rgba(255,255,255,0.75)';
   ctx.font = `${12 * r}px ui-monospace, monospace`;
   ctx.textAlign = 'right';
-  ctx.fillText(`CLAUDIO FM · ${meta}`, out.width - 24 * r, out.height - 24 * r);
+  ctx.fillText(`情绪旅程 · ${meta}`, out.width - 24 * r, out.height - 24 * r);
   return out.toDataURL('image/png');
 }

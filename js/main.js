@@ -1,14 +1,14 @@
 // ————————————————————————————————————————————————
-// main.js · CLAUDIO FM 主控
+// main.js · 情绪旅程 主控
 // 旅程状态机：entry → fork → journey → landing
 // 自动演示循环 / 三档画质 / 持久化 / 分享 / 快照 / 降级
 // ————————————————————————————————————————————————
 import { PARAM_MAP, QUALITY, QUALITY_ORDER, defaultParams } from './config.js';
 import { inferEmotion, emotionColor, quadrantName, PRESETS, clamp, smoothstepN } from './emotion.js';
 import { buildArc, arcPoint, arcCurvature, arcEnergy } from './arc.js';
-import { Renderer } from './renderer.js';
+import { Renderer, makeProjector } from './renderer.js';
 import { AudioEngine } from './audio.js';
-import { Hud, ParamsPanel, Disc } from './hud.js';
+import { Hud, ParamsPanel } from './hud.js';
 import { bindKeys } from './input.js';
 import { loadPrefs, savePrefs, mergeParams, encodeShareURL, decodeShareURL, makeSnapshot } from './state.js';
 import { SKINS, getSkin } from './skins.js';
@@ -29,7 +29,7 @@ const state = {
   debug: 0,
   journey: null,            // { start, end, endpoints, startedAt }
   forkChoice: null,
-  freePoint: { v: -0.1, a: -0.15 }, // 无旅程时圆盘自由点（微冷中性，不偏丧）
+  freePoint: { v: -0.1, a: -0.15 }, // 无旅程时盘面自由点（微冷中性，不偏丧）
   elapsed: 0,
 };
 
@@ -68,24 +68,49 @@ const audio = new AudioEngine();
 audio._brightness = state.params.brightness;
 audio._tempoBase = state.params.tempoBase;
 const hud = new Hud();
-const disc = new Disc($('#disc'), {
-  onDrag(v, a) {
-    // 拖拽 = 自由重锚定：旅程中改写当前坐标
-    if (state.screen === 'journey' && state.arc) {
-      state.journey.start = { v, a, label: quadrantName(v, a) };
-      state.arc = buildArc(state.journey.start, state.journey.end, state.params.curvature);
-      state.pro = 0; state.elapsed = 0;
-      toast('已重新锚定起点');
-    } else {
-      state.freePoint = { v, a };
-    }
-    persist();
-  },
-  onEndpoint(i) {
-    if (state.journey?.endpoints) chooseEndpoint(i);
-  },
-});
 const paramsPanel = new ParamsPanel(state.params, onParamChange);
+
+// ———— 盘面拖拽：主画布命中测试（盘面半径内才接管） ————
+function dragEmotionPoint(v, a) {
+  // 拖拽 = 自由重锚定：旅程中改写当前坐标
+  if (state.screen === 'journey' && state.arc) {
+    state.journey.start = { v, a, label: quadrantName(v, a) };
+    state.arc = buildArc(state.journey.start, state.journey.end, state.params.curvature);
+    state.pro = 0; state.elapsed = 0;
+    toast('已重新锚定起点');
+  } else {
+    state.freePoint = { v, a };
+  }
+  persist();
+}
+(function bindStageDrag() {
+  const stage = renderer.canvas;
+  let dragging = false;
+  const hitTest = (x, y) => {
+    const p = makeProjector(renderer.W, renderer.H);
+    return Math.hypot(x - p.cx, y - p.cy) <= p.radius ? p : null;
+  };
+  const emit = (x, y, proj) => {
+    const v = clamp((x - proj.cx) / proj.scale, -1, 1);
+    const a = clamp(-(y - proj.cy) / proj.scale, -1, 1);
+    dragEmotionPoint(v, a);
+  };
+  stage.addEventListener('pointerdown', e => {
+    const proj = hitTest(e.clientX, e.clientY);
+    if (!proj) return;
+    dragging = true;
+    stage.setPointerCapture(e.pointerId);
+    emit(e.clientX, e.clientY, proj);
+  });
+  stage.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const proj = makeProjector(renderer.W, renderer.H);
+    emit(e.clientX, e.clientY, proj);
+  });
+  const up = () => { dragging = false; };
+  stage.addEventListener('pointerup', up);
+  stage.addEventListener('pointercancel', up);
+})();
 
 audio.onError = (where) => {
   $('#audio-badge').textContent = 'DEGRADED';
@@ -141,7 +166,6 @@ function offerFork(start, endpoints) {
       <span class="fc-coord">V ${e.v.toFixed(2)} · A ${e.a.toFixed(2)}</span>`;
     card.onclick = () => chooseEndpoint(i);
   });
-  disc.endpoints = endpoints;
 }
 
 function chooseEndpoint(i) {
@@ -262,9 +286,9 @@ function doSnapshot() {
   const meta = state.journey
     ? `${state.journey.start.label} → ${state.journey.end.label}`
     : 'FREE DRIFT';
-  const url = makeSnapshot(renderer.canvas, disc.canvas, meta);
+  const url = makeSnapshot(renderer.canvas, meta);
   const a = document.createElement('a');
-  a.href = url; a.download = `claudio-fm-${Date.now()}.png`; a.click();
+  a.href = url; a.download = `mood-journey-${Date.now()}.png`; a.click();
   toast('快照已生成');
 }
 
@@ -272,7 +296,6 @@ function backToEntry() {
   state.screen = 'entry'; state.journey = null; state.arc = null;
   state.playing = false; state.pro = 0;
   audio.pause();
-  disc.endpoints = null; disc.arc = null;
   hud.hide();
   $('#fork').classList.add('hidden');
   $('#entry').classList.remove('hidden');
@@ -367,13 +390,9 @@ function frame(now) {
     quality: quality(),
     skin: skin(),
     debug: state.debug,
+    playing: state.playing,
     audioStatus: audio.status(),
   }, dt);
-
-  // 圆盘与 HUD
-  disc.point = cur;
-  disc.arc = state.arc;
-  disc.draw(state.params.redShift, skin().mode === 'light');
 
   if (state.screen === 'journey') {
     hud.update(dt, {
@@ -391,4 +410,4 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 // 调试句柄（自测与排障用）
-window.__CLAUDIO__ = { state, renderer, audio };
+window.__MOODJOURNEY__ = { state, renderer, audio };
