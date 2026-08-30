@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>情绪旅程 MOOD JOURNEY — 方案B「电台播放器」</title>
+<style>
+  :root{
+    --bg:#05070d;
+    --ink:rgba(238,242,248,.92);
+    --dim:rgba(238,242,248,.42);
+    --faint:rgba(238,242,248,.22);
+    --line:rgba(238,242,248,.12);
+    --serif:"Songti SC","Noto Serif SC",serif;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif;
+    --c1:#5b8cff; --c2:#a06bff;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{background:var(--bg);color:var(--ink);font-family:var(--sans)}
+  body{min-height:100vh}
+
+  .screen{display:none;min-height:100vh;flex-direction:column}
+  #entry{display:flex}
+  #journey:target{display:flex}
+  #journey:target ~ #entry{display:none}
+
+  /* ---------- 顶栏 ---------- */
+  .topbar{
+    height:60px;flex:none;display:flex;align-items:center;justify-content:space-between;
+    padding:0 28px;border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex;align-items:baseline;gap:12px}
+  .brand .zh{font-family:var(--serif);font-size:16px;letter-spacing:.32em}
+  .brand .en{font-family:var(--mono);font-size:10px;letter-spacing:.26em;color:var(--dim)}
+  .topbar .meta{font-family:var(--mono);font-size:10px;letter-spacing:.18em;color:var(--faint)}
+
+  /* ---------- 黑胶唱片 ---------- */
+  .vinyl{
+    position:relative;border-radius:50%;flex:none;
+    background:radial-gradient(circle at 50% 46%, #0c1120 0%, #080b14 62%, #05070d 100%);
+    box-shadow:0 0 120px rgba(90,110,255,.1), 0 24px 70px rgba(0,0,0,.7),
+      inset 0 0 70px rgba(0,0,0,.65);
+  }
+  .vinyl::before{
+    content:"";position:absolute;inset:0;border-radius:50%;
+    background:conic-gradient(from 210deg,
+      transparent 0deg, rgba(255,255,255,.05) 18deg, transparent 60deg,
+      transparent 180deg, rgba(255,255,255,.03) 205deg, transparent 250deg);
+  }
+  .grooves{
+    position:absolute;inset:0;border-radius:50%;
+    background:repeating-radial-gradient(circle at 50% 50%,
+      rgba(255,255,255,.05) 0px, rgba(255,255,255,.05) 1px,
+      transparent 1px, transparent 5px);
+    -webkit-mask:radial-gradient(circle, transparent 0 23.5%, #000 24.5% 96.5%, transparent 97.5%);
+            mask:radial-gradient(circle, transparent 0 23.5%, #000 24.5% 96.5%, transparent 97.5%);
+    animation:spin 72s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .label{
+    position:absolute;left:50%;top:50%;width:23%;height:23%;
+    transform:translate(-50%,-50%);border-radius:50%;
+    background:radial-gradient(circle at 42% 38%, #141a2c, #0a0e1a 70%);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .label::before{
+    content:"";position:absolute;inset:-7%;border-radius:50%;
+    background:conic-gradient(from 90deg, var(--c1), var(--c2), #3a2f66, var(--c1));
+    -webkit-mask:radial-gradient(circle, transparent 0 62%, #000 63% 70%, transparent 71%);
+            mask:radial-gradient(circle, transparent 0 62%, #000 63% 70%, transparent 71%);
+    opacity:.85;
+  }
+  .label .hole{width:14%;height:14%;border-radius:50%;background:var(--bg);
+    box-shadow:0 0 0 1px rgba(255,255,255,.1)}
+  .arc-svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+  .arc-glow{filter:blur(5px);opacity:.55}
+  .dot{
+    position:absolute;width:10px;height:10px;margin:-5px 0 0 -5px;border-radius:50%;
+    background:#fff;z-index:5;
+    box-shadow:0 0 10px 3px rgba(170,150,255,.85), 0 0 30px 8px rgba(120,110,255,.35);
+    animation:breathe 2.8s ease-in-out infinite;
+  }
+  @keyframes breathe{
+    0%,100%{transform:scale(1);box-shadow:0 0 10px 3px rgba(170,150,255,.85),0 0 26px 7px rgba(120,110,255,.3)}
+    50%{transform:scale(1.35);box-shadow:0 0 16px 6px rgba(190,175,255,.95),0 0 44px 14px rgba(130,115,255,.5)}
+  }
+
+  /* ---------- 主体两栏 ---------- */
+  .main{
+    flex:1;display:grid;grid-template-columns:minmax(0,1fr) 360px;
+    gap:32px;padding:28px 28px 120px;min-height:0;
+  }
+  .stage{display:flex;align-items:center;justify-content:center;min-width:0}
+  .journey-vinyl{width:min(62vh,58vw,620px);height:min(62vh,58vw,620px)}
+  .entry-vinyl-b{width:min(52vh,50vw,540px);height:min(52vh,50vw,540px);opacity:.85}
+
+  /* ---------- 信息面板 ---------- */
+  .panel{display:flex;flex-direction:column;gap:16px;min-width:0}
+  .card{
+    border:1px solid var(--line);border-radius:14px;
+    background:rgba(255,255,255,.02);padding:18px 20px;
+  }
+  .card .cap{
+    font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--faint);
+    margin-bottom:12px;display:flex;justify-content:space-between;
+  }
+  .mood-now{font-family:var(--serif);font-size:30px;letter-spacing:.12em;margin-bottom:6px}
+  .mood-now .arrow{color:var(--dim);font-size:20px;margin:0 8px}
+  .mood-target{font-family:var(--serif);font-size:30px;letter-spacing:.12em;color:#b9a8ff}
+  .coords{font-family:var(--mono);font-size:11.5px;letter-spacing:.12em;color:var(--dim);line-height:1.9}
+  .coords em{font-style:normal;color:var(--ink)}
+  .quadrant-tag{
+    display:inline-block;margin-top:10px;padding:4px 12px;border-radius:999px;
+    border:1px solid rgba(150,140,255,.35);color:#b9a8ff;
+    font-family:var(--mono);font-size:10px;letter-spacing:.2em;
+  }
+  .track-name{font-size:14.5px;letter-spacing:.04em;margin-bottom:3px}
+  .track-artist{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;color:var(--dim);margin-bottom:14px}
+  .bar{height:3px;border-radius:2px;background:rgba(255,255,255,.08);overflow:hidden}
+  .bar i{display:block;height:100%;width:38%;border-radius:2px;
+    background:linear-gradient(90deg,var(--c1),var(--c2))}
+  .bar-times{display:flex;justify-content:space-between;margin-top:8px;
+    font-family:var(--mono);font-size:10px;letter-spacing:.12em;color:var(--faint)}
+  .queue{flex:1;display:flex;flex-direction:column}
+  .q-item{
+    display:flex;align-items:center;gap:14px;padding:11px 2px;
+    border-bottom:1px solid rgba(238,242,248,.06);font-size:13.5px;
+  }
+  .q-item:last-child{border-bottom:none}
+  .q-item .no{font-family:var(--mono);font-size:10px;color:var(--faint);width:20px}
+  .q-item .nm{flex:1;letter-spacing:.05em}
+  .q-item .vc{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.08em}
+  .q-item.playing .nm{color:#b9a8ff}
+  .q-item.playing .no{color:#b9a8ff}
+
+  /* ---------- 底部播放条 ---------- */
+  .controlbar{
+    position:fixed;left:0;right:0;bottom:0;height:84px;z-index:30;
+    display:flex;align-items:center;gap:24px;padding:0 28px;
+    background:rgba(7,10,17,.88);backdrop-filter:blur(14px);
+    border-top:1px solid var(--line);
+  }
+  .cb-left{display:flex;align-items:center;gap:14px;flex:none}
+  .cbtn{
+    width:40px;height:40px;border-radius:50%;border:1px solid var(--line);
+    background:rgba(255,255,255,.03);color:var(--ink);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;transition:.25s;
+  }
+  .cbtn:hover{border-color:rgba(150,140,255,.5)}
+  .cbtn.play{width:48px;height:48px;border-color:rgba(238,242,248,.35)}
+  .cb-center{flex:1;display:flex;align-items:center;gap:14px;min-width:0}
+  .cb-center .t{font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.1em;flex:none}
+  .cb-right{flex:none;font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:var(--dim)}
+  .cb-right b{color:#b9a8ff;font-weight:400}
+
+  /* ---------- 入口屏 ---------- */
+  #entry .main{align-items:center;grid-template-columns:minmax(0,1fr) 400px}
+  .entry-panel h1{
+    font-family:var(--serif);font-weight:600;font-size:clamp(28px,2.5vw,34px);
+    letter-spacing:.1em;line-height:1.5;margin:10px 0 8px;
+  }
+  .entry-panel .sub{color:var(--dim);font-size:14px;line-height:1.9;margin-bottom:26px}
+  .input-pill{
+    display:flex;align-items:center;gap:8px;
+    width:100%;height:56px;padding:0 10px 0 24px;
+    border:1px solid var(--line);border-radius:999px;
+    background:rgba(10,14,24,.55);margin-bottom:16px;
+  }
+  .input-pill:focus-within{border-color:rgba(150,140,255,.45)}
+  .input-pill input{
+    flex:1;background:none;border:none;outline:none;color:var(--ink);
+    font-family:var(--sans);font-size:14.5px;min-width:0;
+  }
+  .input-pill input::placeholder{color:var(--faint)}
+  .input-pill .go{
+    flex:none;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);
+    background:rgba(255,255,255,.04);color:var(--ink);font-size:15px;cursor:pointer;
+  }
+  .chips{display:flex;gap:10px;flex-wrap:wrap}
+  .chip{
+    padding:8px 18px;border-radius:999px;border:1px solid var(--line);
+    background:rgba(255,255,255,.02);color:var(--dim);
+    font-family:var(--sans);font-size:13px;letter-spacing:.06em;cursor:pointer;transition:.25s;
+  }
+  .chip:hover{color:var(--ink);border-color:rgba(150,140,255,.5)}
+  .kicker{font-family:var(--mono);font-size:10px;letter-spacing:.36em;color:var(--faint)}
+
+  @media (max-width:860px){
+    .main{grid-template-columns:minmax(0,1fr);gap:24px;padding:20px 20px 116px}
+    .stage{order:-1}
+    .journey-vinyl{width:min(56vw,300px);height:min(56vw,300px)}
+    .entry-vinyl-b{width:min(52vw,260px);height:min(52vw,260px)}
+    .topbar{padding:0 18px}
+    .topbar .meta{display:none}
+    .controlbar{gap:12px;padding:0 16px;height:76px}
+    .cb-right{display:none}
+    .mood-now,.mood-target{font-size:24px}
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="moodArcB" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#5b8cff"/>
+      <stop offset="1" stop-color="#a06bff"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<!-- ============ 旅程播放态（#journey） ============ -->
+<section id="journey" class="screen">
+  <header class="topbar">
+    <div class="brand"><span class="zh">情绪旅程</span><span class="en">MOOD JOURNEY</span></div>
+    <div class="meta">ON AIR · SIDE A</div>
+  </header>
+
+  <div class="main">
+    <div class="stage">
+      <div class="vinyl journey-vinyl">
+        <div class="grooves"></div>
+        <svg class="arc-svg" viewBox="0 0 100 100">
+          <path class="arc-glow" d="M 22 68 C 34 72, 42 46, 58 42 C 68 39.5, 74 34, 78 27"
+                fill="none" stroke="url(#moodArcB)" stroke-width="2.6" stroke-linecap="round"/>
+          <path d="M 22 68 C 34 72, 42 46, 58 42 C 68 39.5, 74 34, 78 27"
+                fill="none" stroke="url(#moodArcB)" stroke-width=".7" stroke-linecap="round" opacity=".95"/>
+        </svg>
+        <div class="label"><span class="hole"></span></div>
+        <div class="dot" style="left:52%;top:45%"></div>
+      </div>
+    </div>
+
+    <aside class="panel">
+      <div class="card">
+        <div class="cap"><span>当前情绪 CURRENT</span><span>Q3 → Q4</span></div>
+        <div><span class="mood-now">沉郁</span><span class="arrow" style="font-family:var(--serif)">→</span><span class="mood-target">平和</span></div>
+        <div class="coords">
+          VALENCE <em>−0.42</em> → <em>+0.35</em><br>
+          AROUSAL <em>−0.18</em> → <em>−0.46</em>
+        </div>
+        <span class="quadrant-tag">低唤醒 · 迁移中</span>
+      </div>
+
+      <div class="card">
+        <div class="cap"><span>正在播放 NOW PLAYING</span><span>02 / 05</span></div>
+        <div class="track-name">雨停之前 Before the Rain Stops</div>
+        <div class="track-artist">KAZUMA ITO · AMBIENT / 自赏</div>
+        <div class="bar"><i></i></div>
+        <div class="bar-times"><span>02:41</span><span>07:12</span></div>
+      </div>
+
+      <div class="card queue">
+        <div class="cap"><span>旅程队列 UP NEXT</span><span>ARC 05</span></div>
+        <div class="q-item"><span class="no">01</span><span class="nm">低语 Whisper</span><span class="vc">V−0.4 A−0.3</span></div>
+        <div class="q-item playing"><span class="no">02</span><span class="nm">雨停之前</span><span class="vc">V−0.1 A−0.4</span></div>
+        <div class="q-item"><span class="no">03</span><span class="nm">暖岸 Warm Shore</span><span class="vc">V+0.2 A−0.4</span></div>
+        <div class="q-item"><span class="no">04</span><span class="nm">归巢 Homecoming</span><span class="vc">V+0.3 A−0.5</span></div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="controlbar">
+    <div class="cb-left">
+      <button class="cbtn" aria-label="上一首">
+        <svg width="13" height="13" viewBox="0 0 14 14"><path d="M3 2v10M11 2L4.5 7 11 12V2z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="cbtn play" aria-label="暂停">
+        <svg width="14" height="14" viewBox="0 0 14 14"><path d="M4 2.5v9M10 2.5v9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+      <button class="cbtn" aria-label="跳过">
+        <svg width="13" height="13" viewBox="0 0 14 14"><path d="M11 2v10M3 2l6.5 5L3 12V2z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <div class="cb-center">
+      <span class="t">02:41</span>
+      <div class="bar" style="flex:1"><i></i></div>
+      <span class="t">07:12</span>
+    </div>
+    <div class="cb-right">旅程 <b>沉郁 → 平和</b> · 38%</div>
+  </div>
+</section>
+
+<!-- ============ 入口屏（默认） ============ -->
+<section id="entry" class="screen">
+  <header class="topbar">
+    <div class="brand"><span class="zh">情绪旅程</span><span class="en">MOOD JOURNEY</span></div>
+    <div class="meta">MOOD RADIO · 24H</div>
+  </header>
+
+  <div class="main">
+    <div class="stage">
+      <div class="vinyl entry-vinyl-b">
+        <div class="grooves"></div>
+        <svg class="arc-svg" viewBox="0 0 100 100">
+          <path class="arc-glow" d="M 22 68 C 34 72, 42 46, 58 42 C 68 39.5, 74 34, 78 27"
+                fill="none" stroke="url(#moodArcB)" stroke-width="2.6" stroke-linecap="round"/>
+          <path d="M 22 68 C 34 72, 42 46, 58 42 C 68 39.5, 74 34, 78 27"
+                fill="none" stroke="url(#moodArcB)" stroke-width=".7" stroke-linecap="round" opacity=".95"/>
+        </svg>
+        <div class="label"><span class="hole"></span></div>
+        <div class="dot" style="left:22%;top:68%"></div>
+      </div>
+    </div>
+
+    <aside class="panel entry-panel">
+      <div class="card" style="padding:28px 28px 30px">
+        <div class="kicker">MOOD JOURNEY · 沉浸式情绪电台</div>
+        <h1>此刻，你在哪里？</h1>
+        <p class="sub">输入一句话心情，我们在情绪平面上为你定位，再用一段音乐弧线，把你送到想去的地方。</p>
+        <div class="input-pill">
+          <input type="text" placeholder="例如：加班到麻木 / 心里很乱 / 有点想哭…">
+          <button class="go" aria-label="开始旅程">→</button>
+        </div>
+        <div class="chips">
+          <button class="chip">累了</button>
+          <button class="chip">心里乱</button>
+          <button class="chip">有点想哭</button>
+          <button class="chip">说不清</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="cap"><span>今日旅程 TODAY</span><span>LIVE</span></div>
+        <div class="q-item"><span class="no">▸</span><span class="nm">焦躁 → 平静</span><span class="vc">1,204 人在听</span></div>
+        <div class="q-item"><span class="no">▸</span><span class="nm">低落 → 微光</span><span class="vc">864 人在听</span></div>
+        <div class="q-item"><span class="no">▸</span><span class="nm">麻木 → 苏醒</span><span class="vc">512 人在听</span></div>
+      </div>
+    </aside>
+  </div>
+</section>
+
+</body>
+</html>

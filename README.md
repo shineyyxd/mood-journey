@@ -58,6 +58,8 @@
 ![旅程](docs/screenshots/journey.png)
 ![纸白皮肤](docs/screenshots/paper.png)
 
+完整版本截图编年史见 [docs/history/](docs/history/)，交互迭代史见 [docs/INTERACTION_CHANGELOG.md](docs/INTERACTION_CHANGELOG.md)。
+
 ## 版本更迭
 
 | 版本 | 时间 | 发生了什么 |
